@@ -1,9 +1,12 @@
 # BrainDrainWall
 
-Estimates what a person is worth to their country in GDP — the number behind
-the "brain drain wall" campaign. Feed it a person (via the Apollo.io People
-Enrichment API), and it returns the GDP they've contributed so far and the GDP
-lost if they leave / gained if they arrive.
+Estimates the economic value associated with a person's career in GDP terms —
+the modelled figure behind the "brain drain wall" campaign. Feed it a person
+(via the Apollo.io People Enrichment API), and it returns their estimated GDP
+contribution to date and a forward-looking estimate of what a country gains by
+attracting that talent — and what Britain missed out on when they built
+elsewhere. **All outputs are modelled estimates, not statements of fact about
+any individual** (see "Responsible use, framing & legal").
 
 This repo is a **backend JSON API** (FastAPI). No frontend.
 
