@@ -76,7 +76,47 @@ class SummaryOut(BaseModel):
     model_version: str
 
 
+class BucketResultOut(BaseModel):
+    bucket: str
+    probability: float
+    lifetime_gva: float
+    reinvestment_gva: float
+    ecosystem_gva: float
+    total_gva: float
+    peak_jobs_supported: float
+    total_tax: float
+
+
+class FounderImpactOut(BaseModel):
+    currency: str
+    expected_gva_footprint: float
+    expected_peak_jobs_supported: float
+    expected_total_tax: float
+    expected_exit_value: float
+    buckets: list[BucketResultOut]
+    realized_current_company: Optional[dict] = None
+    headline_statement: str
+
+
 class GDPImpactResponse(BaseModel):
     person: PersonOut
     summary: SummaryOut
     stints: list[StintScoreOut]
+    founder_impact: Optional[FounderImpactOut] = None
+
+
+class NationalImpactRequest(BaseModel):
+    founders_per_year: int = Field(default=300, ge=1, le=1_000_000)
+    horizon_years: int = Field(default=5, ge=1, le=50)
+
+
+class NationalImpactResponse(BaseModel):
+    currency: str
+    founders_per_year: int
+    expected_gva_per_founder: float
+    annual_gdp_at_stake: float
+    annual_jobs_at_stake: float
+    annual_tax_at_stake: float
+    cumulative_gdp_at_stake: float
+    horizon_years: int
+    headline_statement: str

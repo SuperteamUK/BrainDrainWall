@@ -129,3 +129,80 @@ def macro_index_for_year(year: int) -> float:
     decade = (year // 10) * 10
     decade = min(max(decade, 1970), 2020)
     return MACRO_INDEX[decade]
+
+
+# ---------------------------------------------------------------------------
+# FOUNDER / STARTUP MODEL
+# ---------------------------------------------------------------------------
+# For a founder, the GDP at stake is not their salary leverage but the expected
+# economic footprint of the *company they build* — and, if they leave, build
+# abroad instead. This is a probabilistic (power-law) model: most startups fail,
+# a few are modest exits, a tiny fraction are superstars that carry the return.
+#
+# Currency: GBP (the campaign and the leaving estimate are UK-specific). Anchors
+# come from the Adam Smith Institute "Profitable Peripherals" report (the 18.8%
+# UK tax wedge; the multiplier framing of jobs/taxes supported) and from VC
+# outcome data (~80% fail / ~19% modest / ~1% home run; power-law returns).
+# See METHODOLOGY.md sections 7-8. Every number is a tunable prior.
+
+FOUNDER_CURRENCY = "GBP"
+
+# Outcome buckets implement Path 2 (VC multiples). Probabilities sum to 1.0.
+# Each bucket carries a representative *conditional* company profile.
+OUTCOME_BUCKETS: dict[str, dict[str, float]] = {
+    # high failure rate; tiny, short-lived footprint, no exit.
+    "failure": {
+        "probability": 0.70,
+        "avg_employees": 2.5,
+        "peak_employees": 4,
+        "lifespan_years": 2.5,
+        "exit_value": 0.0,
+    },
+    # "reasonable exit": a real business, modest acquisition.
+    "modest_exit": {
+        "probability": 0.27,
+        "avg_employees": 22,
+        "peak_employees": 40,
+        "lifespan_years": 8,
+        "exit_value": 20_000_000,
+    },
+    # superstar / (near-)unicorn: carries the cohort.
+    "superstar": {
+        "probability": 0.03,
+        "avg_employees": 250,
+        "peak_employees": 500,
+        "lifespan_years": 12,
+        "exit_value": 750_000_000,
+    },
+}
+
+# Path 1: per-startup economic activity.
+GVA_PER_EMPLOYEE = 90_000          # UK tech GVA/worker (national avg ~£60k)
+AVG_STARTUP_SALARY = 55_000        # GBP
+LABOUR_SHARE = 0.60                # wages as share of GVA -> rest is surplus
+GVA_MULTIPLIER = 1.8               # supply-chain + induced (Type II) GVA
+EMPLOYMENT_MULTIPLIER = 2.0        # direct + indirect + induced jobs
+
+# Tax take (Path 1 -> taxes & jobs sustained).
+EMPLOYMENT_TAX_WEDGE = 0.188       # ASI report: 2023 UK tax wedge, married worker
+CORP_OTHER_TAX_RATE = 0.20         # corp tax + VAT share on operating surplus
+CGT_EFFECTIVE_RATE = 0.20          # blended UK CGT on founder liquidity event
+
+# Path 3: reinvestment & cohort effects.
+FOUNDER_EQUITY_AT_EXIT = 0.20      # founder's average retained stake at exit
+REINVEST_FRACTION = 0.30           # of net proceeds recycled into angel/seed
+SEED_TO_GVA_MULTIPLIER = 3.0       # GVA catalysed per £ of seed capital (speculative)
+
+# Path 4: listings / financial-ecosystem effect (superstar bucket only). An IPO
+# sustains advisory, asset-management, legal and trading activity. Modelled as a
+# share of market cap captured as UK financial-services GVA over the listing's
+# life. The most speculative term; the ASI report documents the LSE's decline
+# (market cap $4.3tn 2007 -> $3tn 2024) as a self-reinforcing loss of this base.
+IPO_PROBABILITY_SUPERSTAR = 0.40
+FINANCIAL_ECOSYSTEM_GVA_RATE = 0.20  # fraction of market cap as lifetime UK fin-GVA
+
+# Default annual outflow used by the national aggregate. See METHODOLOGY.md §8.
+# Companies House: ~3,800 directors emigrated Oct-2024..Jul-2025 (~4,500/yr
+# annualised, +40% YoY); high-growth/VC-backed founders are a subset.
+FOUNDERS_LEAVING_PER_YEAR_BROAD = 4000
+FOUNDERS_LEAVING_PER_YEAR_HIGH_GROWTH = 300

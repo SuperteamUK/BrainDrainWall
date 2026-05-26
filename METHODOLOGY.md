@@ -143,3 +143,91 @@ their remaining working life.
   advice.
 - Coefficients are USD-denominated and US-economy-anchored. Other countries
   need their own base intercept and macro series.
+
+---
+
+## 7. The founder / startup model
+
+The §2 model scores an *employee's* value-add. It is the wrong lens for a
+**founder**: when a founder leaves, what the country loses is not their salary
+but the expected economic footprint of the **company they would have built
+here**, and now build abroad. That footprint is power-law distributed — most
+startups fail, a few are modest exits, a tiny fraction carry everything — so we
+compute an **expectation over outcomes** rather than a point estimate. Code:
+`app/founder_model.py`; coefficients in the FOUNDER block of
+`app/coefficients.py`. All figures are **GBP** (the campaign is UK-specific).
+
+The model is the sum of four pathways, each requested for the campaign and each
+grounded in the "Profitable Peripherals" report's multiplier methodology (jobs
+→ wages → taxes, with the 18.8% UK tax wedge) and standard VC outcome data.
+
+**Path 2 — VC outcome multiples (the spine).** Three outcome buckets, calibrated
+to the ~80% fail / ~19% modest / ~1% home-run split observed across VC
+portfolios (softened to 70/27/3 to include non-VC founders and "great but not
+unicorn" outcomes). Each bucket carries a representative *conditional* company:
+average and peak headcount, lifespan, and exit value.
+
+| Bucket       |   p  | avg staff | lifespan | exit value |
+| ------------ | ---- | --------- | -------- | ---------- |
+| failure      | 0.70 |       2.5 | 2.5 yr   | £0         |
+| modest exit  | 0.27 |        22 | 8 yr     | £20m       |
+| superstar    | 0.03 |       250 | 12 yr    | £750m      |
+
+**Path 1 — per-startup economic activity.** For each bucket: lifetime direct
+GVA = `avg_staff × GVA-per-employee (£90k) × lifespan`, scaled by a Type-II
+multiplier (×1.8) for supply-chain and induced activity. Taxes = employment tax
+(wages × 18.8% wedge) + corporation/VAT tax (20% of operating surplus). Jobs
+sustained = peak staff × employment multiplier (×2.0). This is the report's
+"capital → jobs → wages → taxes" chain applied to a company instead of a
+capital stock.
+
+**Path 3 — reinvestment & cohort effects.** On an exit, the founder's retained
+stake (~20%) is a liquidity event: it pays CGT (~20% blended) and a portion
+(~30% of net) is recycled into angel/seed investment, which catalyses new
+company GVA (×3 seed-to-GVA). If the founder has left, this recycling — and any
+re-founding — happens in the Bay Area, not Britain. The most cohort-defining
+term and a deliberately conservative one.
+
+**Path 4 — listings / financial-ecosystem effect (superstar only).** The
+largest companies historically list on the LSE, sustaining advisory, asset
+management, legal and trading activity — the financial-services jobs the report
+documents. We capture this as a share (20%) of a superstar's market cap,
+weighted by an IPO probability (40%), accruing as UK financial-services GVA.
+The report shows this base eroding (LSE market cap $4.3tn in 2007 → $3tn in
+2024 while the US tripled to $53tn) in a self-reinforcing loop: fewer listings →
+shallower capital → lower multiples → more firms leave. This is the **most
+speculative** term and is flagged as such.
+
+**Expected footprint per founder** = Σ_bucket `p · (lifetime_GVA +
+reinvestment_GVA + ecosystem_GVA)`. With the priors above this is **≈ £29m of
+lifetime GDP, ~57 jobs, and ~£3.6m of tax** per high-growth founder. When
+Apollo returns the founder's *current* company size, we additionally report a
+`realized_current_company` footprint scored on actual headcount (Path 1 on
+observed data) — higher accuracy where the data exists.
+
+## 8. How many founders/companies leave per year?
+
+`POST /v1/national-impact` multiplies the per-founder expectation by an annual
+outflow. Two defensible denominators:
+
+- **Broad (all company directors/owners).** Companies House records show ~3,800
+  directors changed their country of residence between Oct 2024 and Jul 2025
+  (~4,500 annualised), a ~40% jump on the prior year's 2,712; ~6,000 have left
+  since late 2023. Headline: **~3,000–4,500 per year, and accelerating.** Top
+  destinations: UAE/Dubai, the US, Monaco.
+- **High-growth / VC-backed founders (the model's target).** ~17,000 VC-backed
+  startups call the UK home; studies find **3.3–4.3% of European VC-backed
+  startups relocate**, ~75% to the US. Cross-referenced with the tech sector
+  leading the director exodus, this implies on the order of **a few hundred
+  high-growth founders per year** (the default used is **300**).
+
+**Important calibration note.** The ≈£29m per-founder figure is calibrated to
+*high-growth / VC-backed* founders. Apply it to the 300 figure (→ ≈£8.6bn GDP,
+~17k jobs, ~£1.1bn tax per annual cohort), **not** to the broad 4,000-director
+count — most of those directors are not building high-growth companies, so using
+the broad number with this coefficient overstates the loss. For the broad
+population, lower the per-founder priors accordingly.
+
+These are order-of-magnitude campaign figures built on public estimates, not a
+fitted micro-dataset. Every coefficient lives in `app/coefficients.py` for
+transparent revision as better data arrives.

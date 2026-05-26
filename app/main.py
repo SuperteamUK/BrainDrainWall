@@ -9,12 +9,16 @@ from __future__ import annotations
 
 from fastapi import FastAPI, HTTPException
 
-from . import apollo, model
+from . import apollo, founder_model, model
 from .coefficients import MODEL_VERSION
 from .parsing import Stint, classify_stint, normalize_apollo, parse_date
 from .schemas import (
+    BucketResultOut,
+    FounderImpactOut,
     GDPImpactRequest,
     GDPImpactResponse,
+    NationalImpactRequest,
+    NationalImpactResponse,
     PersonOut,
     PreviewRequest,
     StintScoreOut,
@@ -28,11 +32,28 @@ app = FastAPI(
 )
 
 
-def _serialize(person: PersonOut, summary, scores) -> GDPImpactResponse:
+def _founder_out(stints: list[Stint], person_name: str) -> FounderImpactOut | None:
+    if not founder_model.is_founder(stints):
+        return None
+    fi = founder_model.compute_founder_impact(stints, person_name=person_name)
+    return FounderImpactOut(
+        currency=fi.currency,
+        expected_gva_footprint=fi.expected_gva_footprint,
+        expected_peak_jobs_supported=fi.expected_peak_jobs_supported,
+        expected_total_tax=fi.expected_total_tax,
+        expected_exit_value=fi.expected_exit_value,
+        buckets=[BucketResultOut(**b.__dict__) for b in fi.buckets],
+        realized_current_company=fi.realized_current_company,
+        headline_statement=fi.headline_statement,
+    )
+
+
+def _serialize(person: PersonOut, summary, scores, stints: list[Stint]) -> GDPImpactResponse:
     return GDPImpactResponse(
         person=person,
         summary=SummaryOut(**summary.__dict__),
         stints=[StintScoreOut(**s.__dict__) for s in scores],
+        founder_impact=_founder_out(stints, person.name or "This founder"),
     )
 
 
@@ -70,7 +91,7 @@ async def gdp_impact(req: GDPImpactRequest) -> GDPImpactResponse:
         current_company=info.current_company,
         linkedin_url=info.linkedin_url,
     )
-    return _serialize(person, summary, scores)
+    return _serialize(person, summary, scores, stints)
 
 
 @app.post("/v1/gdp-impact/preview", response_model=GDPImpactResponse)
@@ -95,4 +116,13 @@ def gdp_impact_preview(req: PreviewRequest) -> GDPImpactResponse:
 
     summary, scores = model.compute_impact(stints, person_name=req.name)
     person = PersonOut(name=req.name, current_company=stints[0].company, current_title=stints[0].title)
-    return _serialize(person, summary, scores)
+    return _serialize(person, summary, scores, stints)
+
+
+@app.post("/v1/national-impact", response_model=NationalImpactResponse)
+def national_impact(req: NationalImpactRequest) -> NationalImpactResponse:
+    """Aggregate GDP/jobs/tax at stake from founders leaving the country per year."""
+    ni = founder_model.compute_national_impact(
+        founders_per_year=req.founders_per_year, horizon_years=req.horizon_years
+    )
+    return NationalImpactResponse(**ni.__dict__)

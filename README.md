@@ -52,6 +52,19 @@ curl -X POST localhost:8000/v1/gdp-impact/preview \
          "start_date":"2017-01-01","current":true,"industry":"Investment Banking"}]}'
 ```
 
+When the person is a **founder/owner**, the response also carries a
+`founder_impact` block: the *expected* GDP footprint of the company they build
+(see below), since for founders that dwarfs their salary leverage.
+
+### `POST /v1/national-impact`
+Aggregate the loss across founders leaving the country per year.
+
+```bash
+curl -X POST localhost:8000/v1/national-impact \
+  -H 'Content-Type: application/json' \
+  -d '{"founders_per_year": 300, "horizon_years": 5}'
+```
+
 ### `GET /health`
 Liveness + model version.
 
@@ -75,12 +88,23 @@ Liveness + model version.
 }
 ```
 
-## Model
+## Two models
 
-The scoring engine and its coefficients are deliberately isolated:
+**Employee model** (`app/model.py`) — the log-linear value-add score described
+above, for people on a career ladder.
 
-- `app/coefficients.py` — every tunable number (the "regression line").
-- `app/model.py` — pure scoring functions over normalised roles.
+**Founder / startup model** (`app/founder_model.py`) — for founders, the loss is
+the company they'd have built. A power-law expectation over outcomes
+(fail / modest exit / superstar) combining four pathways: per-startup economic
+activity (jobs, wages, taxes), VC outcome multiples, founder-exit reinvestment &
+cohort effects, and the LSE listings / financial-services ecosystem effect.
+Currency is GBP; the national aggregate turns this into "GDP lost per year".
+
+The scoring engines and their coefficients are deliberately isolated:
+
+- `app/coefficients.py` — every tunable number (the "regression line" + the
+  founder priors).
+- `app/model.py` / `app/founder_model.py` — pure scoring functions.
 - `app/parsing.py` — title → seniority/function, company → tier, Apollo payload
   normalisation.
 
