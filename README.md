@@ -71,6 +71,22 @@ curl -X POST localhost:8000/v1/national-impact \
 ### `GET /health`
 Liveness + model version.
 
+## Scoring Apollo data without the server
+
+If you already have an Apollo `person` object (e.g. fetched via the Apollo
+**connector**, or a saved `/people/match` response), score it directly — no
+server, no network:
+
+```bash
+python scripts/score_apollo.py path/to/apollo.json            # default framing
+python scripts/score_apollo.py path/to/apollo.json --framing loss
+cat apollo.json | python scripts/score_apollo.py -            # from stdin
+```
+
+It accepts either a full response (`{"person": {...}}`) or a bare person object,
+and prints the headline plus the full GDP breakdown (employee summary + founder
+impact). The reusable function is `app.scoring.score_apollo_person`.
+
 ## Response shape
 
 ```jsonc
