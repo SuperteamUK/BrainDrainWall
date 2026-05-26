@@ -1,8 +1,10 @@
 from __future__ import annotations
 
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+Framing = Literal["missed_out", "loss"]
 
 
 class GDPImpactRequest(BaseModel):
@@ -14,6 +16,9 @@ class GDPImpactRequest(BaseModel):
         default=None, description="Current employer; improves Apollo match accuracy."
     )
     email: Optional[str] = None
+    framing: Optional[Framing] = Field(
+        default=None, description="Narrative framing; defaults to 'missed_out'."
+    )
 
     @model_validator(mode="after")
     def _require_identifier(self) -> "GDPImpactRequest":
@@ -39,6 +44,7 @@ class RawStintInput(BaseModel):
 class PreviewRequest(BaseModel):
     name: str = "This person"
     history: list[RawStintInput]
+    framing: Optional[Framing] = None
 
 
 class StintScoreOut(BaseModel):
@@ -73,6 +79,8 @@ class SummaryOut(BaseModel):
     future_gdp_contribution_npv: float
     lifetime_gdp_contribution: float
     headline_statement: str
+    framing: str
+    disclaimer: str
     model_version: str
 
 
@@ -96,6 +104,8 @@ class FounderImpactOut(BaseModel):
     buckets: list[BucketResultOut]
     realized_current_company: Optional[dict] = None
     headline_statement: str
+    framing: str
+    disclaimer: str
 
 
 class GDPImpactResponse(BaseModel):
@@ -108,6 +118,7 @@ class GDPImpactResponse(BaseModel):
 class NationalImpactRequest(BaseModel):
     founders_per_year: int = Field(default=300, ge=1, le=1_000_000)
     horizon_years: int = Field(default=5, ge=1, le=50)
+    framing: Optional[Framing] = None
 
 
 class NationalImpactResponse(BaseModel):
@@ -120,3 +131,5 @@ class NationalImpactResponse(BaseModel):
     cumulative_gdp_at_stake: float
     horizon_years: int
     headline_statement: str
+    framing: str
+    disclaimer: str

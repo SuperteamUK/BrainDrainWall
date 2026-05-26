@@ -45,6 +45,8 @@ class FounderImpact:
     buckets: list[BucketResult]
     realized_current_company: Optional[dict] = None
     headline_statement: str = ""
+    framing: str = C.DEFAULT_FRAMING
+    disclaimer: str = C.DISCLAIMER
 
 
 def _bucket_footprint(name: str, params: dict[str, float]) -> BucketResult:
@@ -129,9 +131,25 @@ def is_founder(stints: list[Stint]) -> bool:
     return any(s.seniority in ("founder", "owner") for s in stints)
 
 
+def _founder_headline(framing, name, exp_gva, exp_jobs, exp_tax):
+    if framing == "loss":
+        return (
+            f"On a modelled basis, {name} builds a company worth {_money(exp_gva)} in "
+            f"lifetime GDP, sustaining ~{round(exp_jobs)} jobs and {_money(exp_tax)} in tax. "
+            f"If they found abroad, that economic value is lost to the UK."
+        )
+    return (
+        f"On a modelled, expected basis, a founder like {name} builds a company worth "
+        f"~{_money(exp_gva)} in lifetime GDP, sustaining ~{round(exp_jobs)} jobs and "
+        f"{_money(exp_tax)} in tax — what Britain gains by keeping its founders, and "
+        f"what it missed out on when they built abroad."
+    )
+
+
 def compute_founder_impact(
-    stints: list[Stint], person_name: str = "This founder"
+    stints: list[Stint], person_name: str = "This founder", framing: Optional[str] = None
 ) -> FounderImpact:
+    framing = framing or C.DEFAULT_FRAMING
     buckets = [_bucket_footprint(name, p) for name, p in C.OUTCOME_BUCKETS.items()]
 
     exp_gva = sum(b.probability * b.total_gva for b in buckets)
@@ -142,11 +160,7 @@ def compute_founder_impact(
         for b in buckets
     )
 
-    statement = (
-        f"In expectation, {person_name} builds a company worth {_money(exp_gva)} in "
-        f"lifetime GDP, sustaining ~{round(exp_jobs)} jobs and {_money(exp_tax)} in tax. "
-        f"If they found abroad instead, that is the UK's loss."
-    )
+    statement = _founder_headline(framing, person_name, exp_gva, exp_jobs, exp_tax)
 
     return FounderImpact(
         currency=C.FOUNDER_CURRENCY,
@@ -157,6 +171,7 @@ def compute_founder_impact(
         buckets=buckets,
         realized_current_company=_realized_current_company(stints),
         headline_statement=statement,
+        framing=framing,
     )
 
 
@@ -171,24 +186,36 @@ class NationalImpact:
     cumulative_gdp_at_stake: float
     horizon_years: int
     headline_statement: str = ""
+    framing: str = C.DEFAULT_FRAMING
+    disclaimer: str = C.DISCLAIMER
 
 
 def compute_national_impact(
     founders_per_year: int = C.FOUNDERS_LEAVING_PER_YEAR_HIGH_GROWTH,
     horizon_years: int = 5,
+    framing: Optional[str] = None,
 ) -> NationalImpact:
-    per = compute_founder_impact([])
+    framing = framing or C.DEFAULT_FRAMING
+    per = compute_founder_impact([], framing=framing)
     annual_gdp = per.expected_gva_footprint * founders_per_year
     annual_jobs = per.expected_peak_jobs_supported * founders_per_year
     annual_tax = per.expected_total_tax * founders_per_year
     cumulative = annual_gdp * horizon_years
 
-    statement = (
-        f"At ~{founders_per_year} high-growth founders leaving per year, the UK forgoes an "
-        f"estimated {_money(annual_gdp)} of GDP, ~{round(annual_jobs):,} jobs and "
-        f"{_money(annual_tax)} of tax per annual cohort — "
-        f"{_money(cumulative)} over {horizon_years} years."
-    )
+    if framing == "loss":
+        statement = (
+            f"At ~{founders_per_year} high-growth founders leaving per year, the UK forgoes an "
+            f"estimated {_money(annual_gdp)} of GDP, ~{round(annual_jobs):,} jobs and "
+            f"{_money(annual_tax)} of tax per annual cohort — {_money(cumulative)} over "
+            f"{horizon_years} years (modelled estimate)."
+        )
+    else:
+        statement = (
+            f"With ~{founders_per_year} high-growth founders building abroad each year, Britain "
+            f"misses out on an estimated {_money(annual_gdp)} of GDP, ~{round(annual_jobs):,} jobs "
+            f"and {_money(annual_tax)} of tax per annual cohort — {_money(cumulative)} over "
+            f"{horizon_years} years (modelled estimate)."
+        )
 
     return NationalImpact(
         currency=C.FOUNDER_CURRENCY,
@@ -200,4 +227,5 @@ def compute_national_impact(
         cumulative_gdp_at_stake=round(cumulative),
         horizon_years=horizon_years,
         headline_statement=statement,
+        framing=framing,
     )

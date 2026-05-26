@@ -72,6 +72,20 @@ def test_realized_company_only_when_employees_known():
     assert fi.realized_current_company["annual_gva"] > 0
 
 
+def test_framing_default_is_missed_out_and_carries_disclaimer():
+    fi = compute_founder_impact([founder_stint()])
+    assert fi.framing == "missed_out"
+    assert "missed out" in fi.headline_statement.lower()
+    assert "modelled estimate" in fi.disclaimer.lower()
+    assert "not a statement of fact" in fi.disclaimer.lower()
+
+
+def test_loss_framing_opt_in():
+    fi = compute_founder_impact([founder_stint()], framing="loss")
+    assert fi.framing == "loss"
+    assert "lost to the uk" in fi.headline_statement.lower()
+
+
 def test_national_impact_scales_with_founders():
     small = compute_national_impact(founders_per_year=100, horizon_years=5)
     big = compute_national_impact(founders_per_year=300, horizon_years=5)

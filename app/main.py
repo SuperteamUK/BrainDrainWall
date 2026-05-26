@@ -32,10 +32,10 @@ app = FastAPI(
 )
 
 
-def _founder_out(stints: list[Stint], person_name: str) -> FounderImpactOut | None:
+def _founder_out(stints: list[Stint], person_name: str, framing: str) -> FounderImpactOut | None:
     if not founder_model.is_founder(stints):
         return None
-    fi = founder_model.compute_founder_impact(stints, person_name=person_name)
+    fi = founder_model.compute_founder_impact(stints, person_name=person_name, framing=framing)
     return FounderImpactOut(
         currency=fi.currency,
         expected_gva_footprint=fi.expected_gva_footprint,
@@ -45,15 +45,17 @@ def _founder_out(stints: list[Stint], person_name: str) -> FounderImpactOut | No
         buckets=[BucketResultOut(**b.__dict__) for b in fi.buckets],
         realized_current_company=fi.realized_current_company,
         headline_statement=fi.headline_statement,
+        framing=fi.framing,
+        disclaimer=fi.disclaimer,
     )
 
 
-def _serialize(person: PersonOut, summary, scores, stints: list[Stint]) -> GDPImpactResponse:
+def _serialize(person: PersonOut, summary, scores, stints: list[Stint], framing: str) -> GDPImpactResponse:
     return GDPImpactResponse(
         person=person,
         summary=SummaryOut(**summary.__dict__),
         stints=[StintScoreOut(**s.__dict__) for s in scores],
-        founder_impact=_founder_out(stints, person.name or "This founder"),
+        founder_impact=_founder_out(stints, person.name or "This founder", framing),
     )
 
 
@@ -83,7 +85,9 @@ async def gdp_impact(req: GDPImpactRequest) -> GDPImpactResponse:
     if not stints:
         raise HTTPException(status_code=422, detail="No employment history found for this person.")
 
-    summary, scores = model.compute_impact(stints, person_name=info.name or "This person")
+    summary, scores = model.compute_impact(
+        stints, person_name=info.name or "This person", framing=req.framing
+    )
     person = PersonOut(
         name=info.name,
         headline=info.headline,
@@ -91,7 +95,7 @@ async def gdp_impact(req: GDPImpactRequest) -> GDPImpactResponse:
         current_company=info.current_company,
         linkedin_url=info.linkedin_url,
     )
-    return _serialize(person, summary, scores, stints)
+    return _serialize(person, summary, scores, stints, summary.framing)
 
 
 @app.post("/v1/gdp-impact/preview", response_model=GDPImpactResponse)
@@ -114,15 +118,17 @@ def gdp_impact_preview(req: PreviewRequest) -> GDPImpactResponse:
     if not stints:
         raise HTTPException(status_code=422, detail="history must contain at least one entry.")
 
-    summary, scores = model.compute_impact(stints, person_name=req.name)
+    summary, scores = model.compute_impact(stints, person_name=req.name, framing=req.framing)
     person = PersonOut(name=req.name, current_company=stints[0].company, current_title=stints[0].title)
-    return _serialize(person, summary, scores, stints)
+    return _serialize(person, summary, scores, stints, summary.framing)
 
 
 @app.post("/v1/national-impact", response_model=NationalImpactResponse)
 def national_impact(req: NationalImpactRequest) -> NationalImpactResponse:
     """Aggregate GDP/jobs/tax at stake from founders leaving the country per year."""
     ni = founder_model.compute_national_impact(
-        founders_per_year=req.founders_per_year, horizon_years=req.horizon_years
+        founders_per_year=req.founders_per_year,
+        horizon_years=req.horizon_years,
+        framing=req.framing,
     )
     return NationalImpactResponse(**ni.__dict__)

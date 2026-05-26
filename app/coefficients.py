@@ -19,6 +19,24 @@ import math
 
 MODEL_VERSION = "0.1.0-calibrated"
 
+# ---------------------------------------------------------------------------
+# FRAMING & DISCLAIMER (legal/ASA)
+# ---------------------------------------------------------------------------
+# Every figure this service emits is a MODELLED ESTIMATE, never a statement of
+# fact about a named individual — required to keep the public counter defensible
+# to the ASA. The default narrative framing is "what Britain missed out on"
+# (about the founder's success), not "GDP loss caused by you leaving" (which
+# carries defamation risk against individuals). The punchier "loss" framing
+# remains available where the audience/use-case makes it appropriate.
+DEFAULT_FRAMING = "missed_out"   # "missed_out" (defensible default) | "loss"
+
+DISCLAIMER = (
+    "Modelled estimate produced by an economic model from public career data — "
+    "not a statement of fact about any individual. See the methodology for how "
+    "it is calculated."
+)
+
+
 # Reference worker: mid-level individual contributor, generalist function,
 # present-day macro regime, small/SMB employer. Anchored to ~US GDP-per-worker
 # (~$165k) discounted toward the wage floor for a non-leveraged role.

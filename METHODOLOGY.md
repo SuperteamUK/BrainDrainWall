@@ -1,8 +1,14 @@
 # Methodology: Estimating a Person's GDP Footprint from Career History
 
 This document explains how BrainDrainWall converts a LinkedIn-style career
-history into a GDP figure — the number we put on the wall when someone leaves
-or arrives. It is written to be defended in public.
+history into a GDP figure. It is written to be defended in public.
+
+> **Status of the figures.** Everything here produces a **modelled estimate**,
+> not a statement of fact about any individual. The default public framing is
+> *"what Britain missed out on"* (about a founder's success), not *"GDP loss
+> caused by an individual leaving"*. Outputs carry a `disclaimer` and a
+> `framing` field; the public counter must display the estimate caveat and link
+> to this page. See the README's "Responsible use, framing & legal" section.
 
 ## 1. The economic question
 
