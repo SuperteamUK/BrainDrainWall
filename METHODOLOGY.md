@@ -145,6 +145,23 @@ surfaced two ways the model overstated GDP:
    `parsing._founder_has_scale`; the "Startup founder/CEO ~$1.0M" sanity anchor
    above assumes such a scale-qualified founder.
 
+**Round 5 — founder footprint scales with the observed company (current).**
+Scale-gating (Round 4) was binary: every *qualifying* founder then received the
+same flat ≈£29m cohort-average footprint, so a founder of a 15-person company and
+a founder of a 2,000-person company scored identically. Fix: when we can
+**observe** the founder's company size (Apollo enriches the current employer's
+headcount), the footprint is the *realised* footprint of **that company** — the
+report's jobs → wages → taxes chain on actual headcount over a representative
+lifespan, scaling roughly linearly with size — instead of the cohort average. The
+generic power-law expectation is kept only when no size is known (and for the
+national aggregate, which is a cohort average by construction). The response now
+carries `basis` (`observed_company` / `generic_cohort`),
+`company_scale_employees`, and an `established_company_footprint` breakdown. Code:
+`founder_model._established_company_footprint`. A residual step remains at the
+employee-count gate (a venture is either a real company or not), but above it the
+footprint is continuous in size — e.g. ≈£25m at 15 staff, ≈£0.3bn at 200, ≈£3.3bn
+at 2,000.
+
 ## 5. Forward projection (what is lost / gained)
 
 The wall number is forward-looking: the GDP a person *would* contribute over

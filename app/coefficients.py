@@ -231,6 +231,15 @@ SEED_TO_GVA_MULTIPLIER = 3.0       # GVA catalysed per £ of seed capital (specu
 IPO_PROBABILITY_SUPERSTAR = 0.40
 FINANCIAL_ECOSYSTEM_GVA_RATE = 0.20  # fraction of market cap as lifetime UK fin-GVA
 
+# Company-scale conditioning. When we can OBSERVE the founder's company size, the
+# footprint is the realised economic footprint of THAT company (which scales with
+# headcount) rather than the flat power-law cohort average — so a 2,000-person
+# company scores far above a 15-person one. The generic OUTCOME_BUCKETS expectation
+# is used only when no company size is known. See
+# founder_model._established_company_footprint and METHODOLOGY.md §4 (Round 5).
+ESTABLISHED_COMPANY_LIFESPAN = 10     # years of GVA attributed to an observed company
+VALUATION_PER_EMPLOYEE = 250_000      # GBP enterprise value/employee (conservative; feeds reinvestment)
+
 # Default annual outflow used by the national aggregate. See METHODOLOGY.md §8.
 # Companies House: ~3,800 directors emigrated Oct-2024..Jul-2025 (~4,500/yr
 # annualised, +40% YoY); high-growth/VC-backed founders are a subset.

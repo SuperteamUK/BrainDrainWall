@@ -103,6 +103,9 @@ class FounderImpactOut(BaseModel):
     expected_exit_value: float
     buckets: list[BucketResultOut]
     realized_current_company: Optional[dict] = None
+    basis: str = "generic_cohort"
+    company_scale_employees: Optional[int] = None
+    established_company_footprint: Optional[dict] = None
     headline_statement: str
     framing: str
     disclaimer: str
