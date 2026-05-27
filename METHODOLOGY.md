@@ -172,10 +172,20 @@ People Match does not return employment type, so the live path assumes full-time
 unless stated (the §6 caveat applies). (2) A bare "Tutor" / "teaching assistant"
 title now classifies as **junior**, not mid, reflecting its typical (student)
 level. Code: `parsing.classify_employment_type` / `resolve_fte`,
-`coefficients.FTE_BY_EMPLOYMENT_TYPE`. *Known gap (next round):* the founder
-footprint (§7) still uses a flat tech-anchored GVA-per-employee, so a founder of
-a community/education/charity body is overstated relative to a software founder;
-making founder GVA sector- and revenue-aware is the planned fix.
+`coefficients.FTE_BY_EMPLOYMENT_TYPE`.
+
+**Round 7 — sector- and revenue-aware founder footprint (current).** The
+observed-company footprint (Round 5) used a flat tech-anchored GVA-per-employee,
+so a founder of an N-person *community/education/charity* body scored like a
+founder of an N-person software company. Now the footprint's GVA-per-head (and
+per-employee valuation) is scaled by sector via `GVA_PER_EMPLOYEE_SECTOR_FACTOR`
+(education ×0.40, nonprofit ×0.35, government ×0.45 … finance ×1.40), and when a
+*positive* revenue is reported, direct GVA is bounded by it (GVA ≤ revenue;
+Apollo's usual 0/None is treated as missing and ignored). Example: a 22-person
+education-sector founder drops from ≈£36.4m to ≈£14.6m. Code:
+`founder_model._established_company_footprint`. The *generic* cohort expectation
+(used when no company is observed, and for the national aggregate) stays
+tech-anchored by design — that cohort is genuinely tech-heavy.
 
 ## 5. Forward projection (what is lost / gained)
 
@@ -214,11 +224,12 @@ their remaining working life.
   student job still defaults to full-time and is overstated — unless its calendar
   overlaps a higher-value role (the timeline rule, §4 Round 4) or the FTE is
   supplied. See §4 Round 6.
-- **The founder footprint uses a single tech-anchored GVA-per-employee and ignores
-  sector.** A founder of an N-person *community, charity or education* body is
-  scored like a founder of an N-person software company, which overstates
-  low-GVA/non-commercial organisations. Industry-aware founder GVA (and a
-  revenue/again non-profit check) is a known gap — see §4 Round 6 note.
+- **The founder footprint is sector- and revenue-aware for an *observed* company**
+  (§4 Round 7), so a community/education/charity founder is no longer scored like a
+  software founder. Two residuals remain by design: the *generic* cohort
+  expectation (used when no company size is observed) stays tech-anchored, as that
+  cohort is genuinely tech-heavy; and because Apollo's revenue is usually missing,
+  the revenue bound rarely binds in the live path.
 - **Value created outside an employer's books is invisible.** A community
   builder or ecosystem lead who unlocks grants, jobs and companies for *other*
   people generates GDP the model cannot see from their own title and headcount,

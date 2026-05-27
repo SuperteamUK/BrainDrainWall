@@ -117,6 +117,38 @@ def test_unknown_company_size_falls_back_to_generic_cohort():
     assert 5_000_000 < fi.expected_gva_footprint < 100_000_000
 
 
+def _founder_at(industry=None, employees=100, revenue=None):
+    return classify_stint(
+        Stint(
+            company="Co",
+            title="Founder",
+            start_date=date(2020, 1, 1),
+            current=True,
+            employees=employees,
+            industry=industry,
+            annual_revenue=revenue,
+        )
+    )
+
+
+def test_founder_footprint_is_sector_aware():
+    """A founder of a community/education body scores below a software founder
+    at the same headcount (no longer treated like a tech company)."""
+    tech = compute_founder_impact([_founder_at("Computer Software")]).expected_gva_footprint
+    edu = compute_founder_impact([_founder_at("Education Management")]).expected_gva_footprint
+    assert edu < tech
+    assert edu < tech * 0.5  # education factor (0.40) vs tech (1.0)
+
+
+def test_founder_footprint_bounded_by_reported_revenue():
+    """A positive but low reported revenue caps the headcount-based GVA."""
+    no_rev = compute_founder_impact([_founder_at("Computer Software", revenue=None)]).expected_gva_footprint
+    low_rev = compute_founder_impact(
+        [_founder_at("Computer Software", revenue=500_000)]
+    ).expected_gva_footprint
+    assert low_rev < no_rev
+
+
 def test_realized_company_only_when_employees_known():
     assert compute_founder_impact([founder_stint()]).realized_current_company is None
     fi = compute_founder_impact([founder_stint(employees=120)])

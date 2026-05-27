@@ -130,27 +130,37 @@ def _realized_current_company(stints: list[Stint]) -> Optional[dict]:
     }
 
 
-def _observed_founder_company(stints: list[Stint]) -> Optional[int]:
-    """Headcount of the largest company the person actually founded/owns that we
-    have a size for. Apollo enriches only the current employer, so in practice
-    this is the founder's current company when it is the venture they built."""
-    sizes = [s.employees for s in stints if s.seniority in ("founder", "owner") and s.employees]
-    return max(sizes) if sizes else None
+def _observed_founder_company(stints: list[Stint]) -> Optional[Stint]:
+    """The largest company the person actually founded/owns that we have a size
+    for. Apollo enriches only the current employer, so in practice this is the
+    founder's current company when it is the venture they built."""
+    founded = [s for s in stints if s.seniority in ("founder", "owner") and s.employees]
+    return max(founded, key=lambda s: s.employees) if founded else None
 
 
-def _established_company_footprint(employees: int) -> dict:
+def _established_company_footprint(stint: Stint) -> dict:
     """Realised lifetime footprint of an OBSERVED founder company of `employees`
     people: the report's jobs -> wages -> taxes chain on actual headcount over a
     representative company lifespan, plus the founder's exit/reinvestment term.
 
-    Scales with company size, so a 2,000-person company scores far above a
-    15-person one (unlike the flat cohort average). Omits the speculative
-    listings/ecosystem term — that stays in the generic superstar bucket only.
+    Scales with company size AND sector: a community/education/charity body has
+    far lower GVA-per-head than a software firm, so it is no longer scored like
+    one. When a positive revenue is reported, direct GVA is bounded by it (GVA
+    cannot exceed revenue); Apollo usually returns 0/None, treated as missing.
+    Omits the speculative listings/ecosystem term.
     """
-    n = employees
+    n = stint.employees
     years = C.ESTABLISHED_COMPANY_LIFESPAN
+    sector_factor = C.GVA_PER_EMPLOYEE_SECTOR_FACTOR.get(
+        stint.industry_key, C.GVA_PER_EMPLOYEE_SECTOR_FACTOR["general"]
+    )
+    gva_per_employee = C.GVA_PER_EMPLOYEE * sector_factor
 
-    direct_gva = n * C.GVA_PER_EMPLOYEE * years
+    annual_direct_gva = n * gva_per_employee
+    if stint.annual_revenue and stint.annual_revenue > 0:
+        annual_direct_gva = min(annual_direct_gva, stint.annual_revenue)
+
+    direct_gva = annual_direct_gva * years
     lifetime_gva = direct_gva * C.GVA_MULTIPLIER
 
     total_wages = n * C.AVG_STARTUP_SALARY * years
@@ -158,13 +168,15 @@ def _established_company_footprint(employees: int) -> dict:
     operating_surplus = max(0.0, direct_gva - total_wages)
     corp_tax = operating_surplus * C.CORP_OTHER_TAX_RATE
 
-    exit_value = n * C.VALUATION_PER_EMPLOYEE
+    exit_value = n * C.VALUATION_PER_EMPLOYEE * sector_factor
     proceeds = exit_value * C.FOUNDER_EQUITY_AT_EXIT
     cgt = proceeds * C.CGT_EFFECTIVE_RATE
     reinvestment_gva = (proceeds - cgt) * C.REINVEST_FRACTION * C.SEED_TO_GVA_MULTIPLIER
 
     return {
         "employees": n,
+        "industry": stint.industry_key,
+        "gva_per_employee": round(gva_per_employee),
         "lifespan_years": years,
         "gva": round(lifetime_gva + reinvestment_gva),
         "lifetime_gva": round(lifetime_gva),
@@ -231,8 +243,9 @@ def compute_founder_impact(
     # If we can see the company the founder actually built, use ITS realised
     # footprint (scales with headcount) instead of the flat cohort average — so a
     # founder of a 2,000-person company is not scored like one of a 15-person one.
-    observed_n = _observed_founder_company(stints)
-    established = _established_company_footprint(observed_n) if observed_n else None
+    observed = _observed_founder_company(stints)
+    established = _established_company_footprint(observed) if observed else None
+    observed_n = observed.employees if observed else None
 
     if established:
         basis = "observed_company"

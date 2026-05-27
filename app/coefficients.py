@@ -259,6 +259,30 @@ FINANCIAL_ECOSYSTEM_GVA_RATE = 0.20  # fraction of market cap as lifetime UK fin
 ESTABLISHED_COMPANY_LIFESPAN = 10     # years of GVA attributed to an observed company
 VALUATION_PER_EMPLOYEE = 250_000      # GBP enterprise value/employee (conservative; feeds reinvestment)
 
+# GVA-per-employee varies hugely by sector — a tech firm's value-add per head
+# dwarfs a community/education/charity body's. For an OBSERVED founder company the
+# footprint's GVA and per-employee valuation are scaled by sector, relative to the
+# tech-anchored GVA_PER_EMPLOYEE; unknown sector sits near the national average.
+# (The generic high-growth cohort buckets stay tech-anchored — that cohort is
+# genuinely tech-heavy.) A 22-person community collective is no longer scored like
+# a 22-person software company. See founder_model._established_company_footprint.
+GVA_PER_EMPLOYEE_SECTOR_FACTOR = {
+    "finance": 1.40,
+    "technology": 1.00,
+    "energy": 1.30,
+    "consulting": 1.10,
+    "telecom": 1.10,
+    "real_estate": 0.90,
+    "manufacturing": 0.90,
+    "healthcare": 0.80,
+    "media": 0.80,
+    "retail": 0.60,
+    "government": 0.45,
+    "education": 0.40,
+    "nonprofit": 0.35,
+    "general": 0.70,
+}
+
 # Default annual outflow used by the national aggregate. See METHODOLOGY.md §8.
 # Companies House: ~3,800 directors emigrated Oct-2024..Jul-2025 (~4,500/yr
 # annualised, +40% YoY); high-growth/VC-backed founders are a subset.
