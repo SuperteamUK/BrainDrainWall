@@ -44,6 +44,9 @@ class FounderImpact:
     expected_exit_value: float
     buckets: list[BucketResult]
     realized_current_company: Optional[dict] = None
+    basis: str = "generic_cohort"               # "observed_company" | "generic_cohort"
+    company_scale_employees: Optional[int] = None
+    established_company_footprint: Optional[dict] = None
     headline_statement: str = ""
     framing: str = C.DEFAULT_FRAMING
     disclaimer: str = C.DISCLAIMER
@@ -127,11 +130,73 @@ def _realized_current_company(stints: list[Stint]) -> Optional[dict]:
     }
 
 
+def _observed_founder_company(stints: list[Stint]) -> Optional[int]:
+    """Headcount of the largest company the person actually founded/owns that we
+    have a size for. Apollo enriches only the current employer, so in practice
+    this is the founder's current company when it is the venture they built."""
+    sizes = [s.employees for s in stints if s.seniority in ("founder", "owner") and s.employees]
+    return max(sizes) if sizes else None
+
+
+def _established_company_footprint(employees: int) -> dict:
+    """Realised lifetime footprint of an OBSERVED founder company of `employees`
+    people: the report's jobs -> wages -> taxes chain on actual headcount over a
+    representative company lifespan, plus the founder's exit/reinvestment term.
+
+    Scales with company size, so a 2,000-person company scores far above a
+    15-person one (unlike the flat cohort average). Omits the speculative
+    listings/ecosystem term — that stays in the generic superstar bucket only.
+    """
+    n = employees
+    years = C.ESTABLISHED_COMPANY_LIFESPAN
+
+    direct_gva = n * C.GVA_PER_EMPLOYEE * years
+    lifetime_gva = direct_gva * C.GVA_MULTIPLIER
+
+    total_wages = n * C.AVG_STARTUP_SALARY * years
+    employment_tax = total_wages * C.EMPLOYMENT_TAX_WEDGE
+    operating_surplus = max(0.0, direct_gva - total_wages)
+    corp_tax = operating_surplus * C.CORP_OTHER_TAX_RATE
+
+    exit_value = n * C.VALUATION_PER_EMPLOYEE
+    proceeds = exit_value * C.FOUNDER_EQUITY_AT_EXIT
+    cgt = proceeds * C.CGT_EFFECTIVE_RATE
+    reinvestment_gva = (proceeds - cgt) * C.REINVEST_FRACTION * C.SEED_TO_GVA_MULTIPLIER
+
+    return {
+        "employees": n,
+        "lifespan_years": years,
+        "gva": round(lifetime_gva + reinvestment_gva),
+        "lifetime_gva": round(lifetime_gva),
+        "reinvestment_gva": round(reinvestment_gva),
+        "peak_jobs_supported": round(n * C.EMPLOYMENT_MULTIPLIER, 1),
+        "total_tax": round(employment_tax + corp_tax + cgt),
+        "exit_value": round(exit_value),
+    }
+
+
 def is_founder(stints: list[Stint]) -> bool:
+    """True only for *scale-qualified* founders/owners. parsing.classify_stint
+    reclassifies sub-scale founders (no employees/revenue/firm scale) to
+    `self_employed`, so a solo or side venture does not trigger the founder
+    footprint — that lens is calibrated to high-growth founders (METHODOLOGY §7-8)."""
     return any(s.seniority in ("founder", "owner") for s in stints)
 
 
-def _founder_headline(framing, name, exp_gva, exp_jobs, exp_tax):
+def _founder_headline(framing, name, exp_gva, exp_jobs, exp_tax, observed_employees=None):
+    if observed_employees:
+        scale = f"the company {name} has built (~{observed_employees:,} staff)"
+        if framing == "loss":
+            return (
+                f"On a modelled basis, {scale} represents {_money(exp_gva)} in lifetime GDP, "
+                f"sustaining ~{round(exp_jobs)} jobs and {_money(exp_tax)} in tax. If they build "
+                f"their next company abroad, that economic value is lost to the UK."
+            )
+        return (
+            f"On a modelled estimate, {scale} represents ~{_money(exp_gva)} in lifetime GDP, "
+            f"sustaining ~{round(exp_jobs)} jobs and {_money(exp_tax)} in tax — what Britain gains "
+            f"by keeping its founders, and what it missed out on when they built abroad."
+        )
     if framing == "loss":
         return (
             f"On a modelled basis, {name} builds a company worth {_money(exp_gva)} in "
@@ -152,15 +217,33 @@ def compute_founder_impact(
     framing = framing or C.DEFAULT_FRAMING
     buckets = [_bucket_footprint(name, p) for name, p in C.OUTCOME_BUCKETS.items()]
 
-    exp_gva = sum(b.probability * b.total_gva for b in buckets)
-    exp_jobs = sum(b.probability * b.peak_jobs_supported for b in buckets)
-    exp_tax = sum(b.probability * b.total_tax for b in buckets)
-    exp_exit = sum(
+    # Generic cohort expectation over the power-law of outcomes. This is the
+    # right lens when we know nothing about the venture (and for the national
+    # aggregate, which averages over a whole cohort of founders).
+    generic_gva = sum(b.probability * b.total_gva for b in buckets)
+    generic_jobs = sum(b.probability * b.peak_jobs_supported for b in buckets)
+    generic_tax = sum(b.probability * b.total_tax for b in buckets)
+    generic_exit = sum(
         C.OUTCOME_BUCKETS[b.bucket]["probability"] * C.OUTCOME_BUCKETS[b.bucket]["exit_value"]
         for b in buckets
     )
 
-    statement = _founder_headline(framing, person_name, exp_gva, exp_jobs, exp_tax)
+    # If we can see the company the founder actually built, use ITS realised
+    # footprint (scales with headcount) instead of the flat cohort average — so a
+    # founder of a 2,000-person company is not scored like one of a 15-person one.
+    observed_n = _observed_founder_company(stints)
+    established = _established_company_footprint(observed_n) if observed_n else None
+
+    if established:
+        basis = "observed_company"
+        exp_gva, exp_jobs = established["gva"], established["peak_jobs_supported"]
+        exp_tax, exp_exit = established["total_tax"], established["exit_value"]
+    else:
+        basis = "generic_cohort"
+        exp_gva, exp_jobs = generic_gva, generic_jobs
+        exp_tax, exp_exit = generic_tax, generic_exit
+
+    statement = _founder_headline(framing, person_name, exp_gva, exp_jobs, exp_tax, observed_n)
 
     return FounderImpact(
         currency=C.FOUNDER_CURRENCY,
@@ -170,6 +253,9 @@ def compute_founder_impact(
         expected_exit_value=round(exp_exit),
         buckets=buckets,
         realized_current_company=_realized_current_company(stints),
+        basis=basis,
+        company_scale_employees=observed_n,
+        established_company_footprint=established,
         headline_statement=statement,
         framing=framing,
     )

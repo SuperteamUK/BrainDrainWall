@@ -64,3 +64,33 @@ def test_score_founder_payload_adds_block():
 def test_framing_passthrough():
     r = score_apollo_person(CFO_PAYLOAD, framing="loss")
     assert r["summary"]["framing"] == "loss"
+
+
+SIDE_HUSTLE_PAYLOAD = {
+    "name": "Side Hustler",
+    "title": "Marketing Lead",
+    "organization": {"name": "DayJob Co", "estimated_num_employees": 5000},
+    "employment_history": [
+        {
+            "organization_name": "DayJob Co",
+            "title": "Marketing Lead",
+            "start_date": "2022-01-01",
+            "current": True,
+        },
+        {
+            # A defunct one-person Instagram brand: no headcount, no revenue.
+            "organization_name": "Hobby Brand",
+            "title": "Founder",
+            "start_date": "2018-01-01",
+            "end_date": "2019-06-01",
+            "current": False,
+        },
+    ],
+}
+
+
+def test_sub_scale_founder_adds_no_founder_block():
+    r = score_apollo_person(SIDE_HUSTLE_PAYLOAD)
+    assert r["founder_impact"] is None
+    hobby = next(s for s in r["stints"] if s["company"] == "Hobby Brand")
+    assert hobby["seniority"] == "self_employed"

@@ -22,9 +22,25 @@ def founder_stint(employees=None):
 
 
 def test_is_founder_detection():
-    assert is_founder([founder_stint()]) is True
+    # A scale-qualified founder (real headcount) is a founder...
+    assert is_founder([founder_stint(employees=60)]) is True
     employee = classify_stint(Stint(company="BigCo", title="Software Engineer"))
     assert is_founder([employee]) is False
+
+
+def test_sub_scale_founder_is_not_a_founder():
+    # A solo / side / defunct micro-venture (no employees, revenue or firm scale)
+    # is scored as self-employed and must NOT trigger the founder footprint.
+    micro = classify_stint(
+        Stint(
+            company="Hobby Brand",
+            title="Founder",
+            start_date=date(2019, 1, 1),
+            end_date=date(2020, 1, 1),
+        )
+    )
+    assert micro.seniority == "self_employed"
+    assert is_founder([micro]) is False
 
 
 def test_bucket_probabilities_sum_to_one():
@@ -61,6 +77,43 @@ def test_failure_bucket_has_no_exit_effects():
 def test_expected_footprint_in_plausible_range():
     # Per-founder expected lifetime GVA should land in the tens of millions GBP.
     fi = compute_founder_impact([founder_stint()])
+    assert 5_000_000 < fi.expected_gva_footprint < 100_000_000
+
+
+def test_footprint_scales_with_observed_company_size():
+    """A founder of a big company must score far above one of a small company."""
+    small = compute_founder_impact([founder_stint(employees=20)]).expected_gva_footprint
+    mid = compute_founder_impact([founder_stint(employees=200)]).expected_gva_footprint
+    big = compute_founder_impact([founder_stint(employees=2000)]).expected_gva_footprint
+    assert small < mid < big
+    assert big > small * 10  # roughly linear in headcount
+
+
+def test_observed_company_basis_and_fields():
+    fi = compute_founder_impact([founder_stint(employees=200)])
+    assert fi.basis == "observed_company"
+    assert fi.company_scale_employees == 200
+    assert fi.established_company_footprint["employees"] == 200
+    # the headline footprint is the observed company's, not the cohort average
+    assert fi.established_company_footprint["gva"] == fi.expected_gva_footprint
+    assert "200 staff" in fi.headline_statement
+
+
+def test_unknown_company_size_falls_back_to_generic_cohort():
+    # Founder qualified by revenue (not headcount): no observed size -> generic.
+    rev_founder = classify_stint(
+        Stint(
+            company="RevCo",
+            title="Founder",
+            start_date=date(2020, 1, 1),
+            current=True,
+            annual_revenue=5_000_000,
+        )
+    )
+    fi = compute_founder_impact([rev_founder])
+    assert fi.basis == "generic_cohort"
+    assert fi.company_scale_employees is None
+    assert fi.established_company_footprint is None
     assert 5_000_000 < fi.expected_gva_footprint < 100_000_000
 
 

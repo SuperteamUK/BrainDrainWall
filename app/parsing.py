@@ -7,6 +7,8 @@ from dataclasses import dataclass, field
 from datetime import date
 from typing import Any, Optional
 
+from . import coefficients as C
+
 
 @dataclass
 class Stint:
@@ -193,11 +195,33 @@ def tier_for_company(
     return 1  # unknown private company: assume SMB
 
 
+def _founder_has_scale(stint: Stint) -> bool:
+    """Evidence that a founder/owner's venture is a real, scaled company rather
+    than a solo, side or defunct micro-venture.
+
+    The founder lens — the steep seniority premium here and the expected-company
+    footprint in founder_model — is calibrated to scale-qualified, company-
+    building founders (METHODOLOGY.md §7-8). Applying it to a one-person
+    Instagram brand or a hobby project massively overstates GDP, so we require a
+    scale signal before granting it.
+    """
+    if stint.employees and stint.employees >= C.FOUNDER_SCALE_MIN_EMPLOYEES:
+        return True
+    if stint.annual_revenue and stint.annual_revenue > 0:
+        return True
+    return stint.tier >= 2
+
+
 def classify_stint(stint: Stint) -> Stint:
     stint.seniority = classify_seniority(stint.title)
     stint.function = classify_function(stint.title)
     stint.industry_key = classify_industry(stint.industry)
     stint.tier = tier_for_company(stint.company, stint.employees, stint.annual_revenue)
+    # A founder/owner with no evidence of scale is scored as self-employed, not
+    # as a company-building founder (which would otherwise grant a ~7x premium
+    # and the high-growth founder footprint regardless of the venture's size).
+    if stint.seniority in ("founder", "owner") and not _founder_has_scale(stint):
+        stint.seniority = "self_employed"
     return stint
 
 

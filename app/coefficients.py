@@ -17,7 +17,7 @@ without touching any other code.
 
 import math
 
-MODEL_VERSION = "0.1.0-calibrated"
+MODEL_VERSION = "0.2.0-calibrated"
 
 # ---------------------------------------------------------------------------
 # FRAMING & DISCLAIMER (legal/ASA)
@@ -47,6 +47,9 @@ SENIORITY_BETA = {
     "entry": -0.70,
     "junior": -0.30,
     "mid": 0.00,
+    # Solo / sub-scale founder (no firm scale to steer): a capable self-employed
+    # individual, not a company-building founder. See parsing._founder_has_scale.
+    "self_employed": 0.35,
     "senior": 0.35,
     "manager": 0.50,
     "senior_manager": 0.75,
@@ -65,6 +68,7 @@ LEVERAGE_WEIGHT = {
     "entry": 0.10,
     "junior": 0.15,
     "mid": 0.20,
+    "self_employed": 0.25,
     "senior": 0.35,
     "manager": 0.45,
     "senior_manager": 0.55,
@@ -75,6 +79,14 @@ LEVERAGE_WEIGHT = {
     "founder": 1.00,
     "clevel": 1.00,
 }
+
+# A founder/owner is scored as a high-leverage, company-building founder (the
+# steep seniority premium AND the expected-company footprint) only with evidence
+# the venture has real scale: at least this many employees, or any revenue, or a
+# mid-market+ firm tier. Without it, a solo / side / defunct micro-venture is
+# scored as `self_employed` on the employee model and triggers no founder
+# footprint. See parsing._founder_has_scale and METHODOLOGY.md §4 (Round 4).
+FOUNDER_SCALE_MIN_EMPLOYEES = 10
 
 FUNCTION_BETA = {
     "engineering": 0.20,
@@ -218,6 +230,15 @@ SEED_TO_GVA_MULTIPLIER = 3.0       # GVA catalysed per £ of seed capital (specu
 # (market cap $4.3tn 2007 -> $3tn 2024) as a self-reinforcing loss of this base.
 IPO_PROBABILITY_SUPERSTAR = 0.40
 FINANCIAL_ECOSYSTEM_GVA_RATE = 0.20  # fraction of market cap as lifetime UK fin-GVA
+
+# Company-scale conditioning. When we can OBSERVE the founder's company size, the
+# footprint is the realised economic footprint of THAT company (which scales with
+# headcount) rather than the flat power-law cohort average — so a 2,000-person
+# company scores far above a 15-person one. The generic OUTCOME_BUCKETS expectation
+# is used only when no company size is known. See
+# founder_model._established_company_footprint and METHODOLOGY.md §4 (Round 5).
+ESTABLISHED_COMPANY_LIFESPAN = 10     # years of GVA attributed to an observed company
+VALUATION_PER_EMPLOYEE = 250_000      # GBP enterprise value/employee (conservative; feeds reinvestment)
 
 # Default annual outflow used by the national aggregate. See METHODOLOGY.md §8.
 # Companies House: ~3,800 directors emigrated Oct-2024..Jul-2025 (~4,500/yr
