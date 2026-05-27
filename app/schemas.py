@@ -39,6 +39,10 @@ class RawStintInput(BaseModel):
     industry: Optional[str] = None
     employees: Optional[int] = None
     annual_revenue: Optional[float] = None
+    employment_type: Optional[str] = Field(
+        default=None, description="full_time/part_time/internship/freelance/...; defaults to full_time."
+    )
+    fte: Optional[float] = Field(default=None, ge=0.0, le=1.0, description="Explicit full-time-equivalent (0-1).")
 
 
 class PreviewRequest(BaseModel):
@@ -57,6 +61,7 @@ class StintScoreOut(BaseModel):
     years: float
     annual_gdp_contribution: float
     total_gdp_contribution: float
+    employment_type: str = "full_time"
     components: dict[str, float]
 
 

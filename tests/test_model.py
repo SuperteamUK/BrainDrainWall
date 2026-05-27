@@ -108,6 +108,25 @@ def test_sub_scale_founder_scores_far_below_scaled_founder():
     assert annual_contribution(micro)[0] < annual_contribution(scaled)[0] / 3
 
 
+def test_part_time_scales_down_annual_contribution():
+    full = make("Tutor", "MyTutor", "2018-01-01", "2023-01-01")
+    part = make("Tutor", "MyTutor", "2018-01-01", "2023-01-01")
+    part.employment_type = "part_time"
+    full_annual = annual_contribution(full)[0]
+    part_annual = annual_contribution(part)[0]
+    assert abs(part_annual - full_annual * 0.4) < 1.0
+    # explicit low FTE drives it lower still (e.g. a few hours a week)
+    part.fte = 0.1
+    assert abs(annual_contribution(part)[0] - full_annual * 0.1) < 1.0
+
+
+def test_tutor_is_junior_not_mid():
+    tutor = make("Tutor", "MyTutor", "2018-01-01", "2023-01-01")
+    mid = make("Coordinator", "MyTutor", "2018-01-01", "2023-01-01")
+    assert tutor.seniority == "junior"
+    assert annual_contribution(tutor)[0] < annual_contribution(mid)[0]
+
+
 def test_no_dates_does_not_crash():
     stint = classify_stint(Stint(company="X", title="Engineer"))
     summary, scores = compute_impact([stint], person_name="Nobody")

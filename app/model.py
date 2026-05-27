@@ -12,7 +12,7 @@ from datetime import date
 from typing import Optional
 
 from . import coefficients as C
-from .parsing import Stint
+from .parsing import Stint, resolve_fte
 
 
 @dataclass
@@ -26,6 +26,7 @@ class StintScore:
     years: float
     annual_gdp_contribution: float
     total_gdp_contribution: float
+    employment_type: str = "full_time"
     components: dict[str, float] = field(default_factory=dict)
 
 
@@ -68,7 +69,10 @@ def annual_contribution(stint: Stint) -> tuple[float, dict[str, float]]:
     b_macro = C.MACRO_BETA * math.log(C.macro_index_for_year(year))
 
     log_value = base + b_sen + b_fun + b_ind + leverage + b_macro
-    value = math.exp(log_value)
+    # FTE is a linear scalar on the dollar figure (a half-time role makes ~half
+    # the value-add), applied outside the log-linear specification.
+    fte = resolve_fte(stint)
+    value = math.exp(log_value) * fte
 
     components = {
         "base": round(math.exp(base)),
@@ -77,6 +81,7 @@ def annual_contribution(stint: Stint) -> tuple[float, dict[str, float]]:
         "industry_x": round(math.exp(b_ind), 3),
         "firm_leverage_x": round(math.exp(leverage), 3),
         "macro_x": round(math.exp(b_macro), 3),
+        "fte_x": round(fte, 3),
     }
     return value, components
 
@@ -94,6 +99,7 @@ def score_stint(stint: Stint, today: Optional[date] = None) -> StintScore:
         years=round(years, 2),
         annual_gdp_contribution=round(annual),
         total_gdp_contribution=round(annual * years),
+        employment_type=stint.employment_type or "full_time",
         components=components,
     )
 

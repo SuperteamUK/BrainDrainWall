@@ -1,11 +1,14 @@
 from datetime import date
 
 from app.parsing import (
+    Stint,
+    classify_employment_type,
     classify_function,
     classify_industry,
     classify_seniority,
     normalize_apollo,
     parse_date,
+    resolve_fte,
     tier_for_company,
 )
 
@@ -27,6 +30,22 @@ def test_seniority_classification():
     assert classify_seniority("Co-Founder & CEO") == "founder"
     assert classify_seniority("Marketing Intern") == "entry"
     assert classify_seniority("Managing Partner") == "partner"
+    assert classify_seniority("Tutor") == "junior"  # student/junior, not mid
+
+
+def test_employment_type_classification():
+    assert classify_employment_type("Software Engineer (Part-time)") == "part_time"
+    assert classify_employment_type("Summer Intern") == "internship"
+    assert classify_employment_type("Freelance Designer") == "freelance"
+    assert classify_employment_type("Tutor") is None  # no marker -> caller defaults full-time
+    assert classify_employment_type(None, "part time", None) == "part_time"
+
+
+def test_resolve_fte():
+    assert resolve_fte(Stint(company="X", title="Y")) == 1.0  # unknown -> full-time
+    assert resolve_fte(Stint(company="X", title="Y", employment_type="part_time")) == 0.4
+    assert resolve_fte(Stint(company="X", title="Y", fte=0.1)) == 0.1  # explicit wins
+    assert resolve_fte(Stint(company="X", title="Y", employment_type="part_time", fte=0.05)) == 0.05
 
 
 def test_function_classification():

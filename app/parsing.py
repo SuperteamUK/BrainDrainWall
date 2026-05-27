@@ -20,6 +20,8 @@ class Stint:
     industry: Optional[str] = None
     employees: Optional[int] = None
     annual_revenue: Optional[float] = None
+    employment_type: Optional[str] = None   # full_time / part_time / internship / ...
+    fte: Optional[float] = None             # explicit full-time-equivalent override (0-1)
     # Filled in by classification.
     seniority: str = "mid"
     function: str = "general"
@@ -80,8 +82,21 @@ _SENIORITY_RULES: list[tuple[str, str]] = [
     (r"\b(senior manager|sr\.? manager)\b", "senior_manager"),
     (r"\b(manager|mgr)\b", "manager"),
     (r"\b(senior|sr\.?|staff|principal|lead)\b", "senior"),
-    (r"\b(junior|jr\.?|associate|analyst|assistant)\b", "junior"),
+    (r"\b(junior|jr\.?|associate|analyst|assistant|tutor|teaching assistant)\b", "junior"),
     (r"\b(intern|trainee|apprentice|graduate|entry)\b", "entry"),
+]
+
+# Employment-type markers (part-time, internship, etc.). Searched in the title
+# and in Apollo's `kind`/`description` when present; absent => treated full-time.
+_EMPLOYMENT_TYPE_RULES: list[tuple[str, str]] = [
+    (r"\b(part[\s-]?time)\b", "part_time"),
+    (r"\b(full[\s-]?time)\b", "full_time"),
+    (r"\b(internship|intern)\b", "internship"),
+    (r"\b(apprentice(ship)?)\b", "apprenticeship"),
+    (r"\b(freelance|freelancer)\b", "freelance"),
+    (r"\b(contractor|contract)\b", "contract"),
+    (r"\b(seasonal|temporary|temp)\b", "seasonal"),
+    (r"\b(volunteer|voluntary)\b", "volunteer"),
 ]
 
 _FUNCTION_RULES: list[tuple[str, str]] = [
@@ -158,6 +173,29 @@ def classify_industry(industry: Optional[str]) -> str:
     return "general"
 
 
+def classify_employment_type(*texts: Optional[str]) -> Optional[str]:
+    """Detect an employment type from any of the supplied texts (title, Apollo
+    `kind`/`description`). Returns None when nothing matches, so the caller can
+    fall back to full-time."""
+    blob = " ".join(t for t in texts if t).lower()
+    if not blob:
+        return None
+    for pattern, kind in _EMPLOYMENT_TYPE_RULES:
+        if re.search(pattern, blob):
+            return kind
+    return None
+
+
+def resolve_fte(stint: "Stint") -> float:
+    """Full-time-equivalent fraction for a stint: an explicit `fte` wins, else the
+    employment type's weight, else full-time."""
+    if stint.fte is not None:
+        return max(0.0, min(1.0, stint.fte))
+    if stint.employment_type:
+        return C.FTE_BY_EMPLOYMENT_TYPE.get(stint.employment_type, C.DEFAULT_FTE)
+    return C.DEFAULT_FTE
+
+
 def tier_for_company(
     name: str,
     employees: Optional[int] = None,
@@ -217,6 +255,8 @@ def classify_stint(stint: Stint) -> Stint:
     stint.function = classify_function(stint.title)
     stint.industry_key = classify_industry(stint.industry)
     stint.tier = tier_for_company(stint.company, stint.employees, stint.annual_revenue)
+    if stint.employment_type is None:
+        stint.employment_type = classify_employment_type(stint.title)
     # A founder/owner with no evidence of scale is scored as self-employed, not
     # as a company-building founder (which would otherwise grant a ~7x premium
     # and the high-growth founder footprint regardless of the venture's size).
@@ -253,6 +293,11 @@ def normalize_apollo(person: dict[str, Any]) -> tuple[PersonInfo, list[Stint]]:
         emp = org.get("estimated_num_employees") if is_current else None
         rev = org.get("annual_revenue") if is_current else None
         industry = org.get("industry") if is_current else None
+        # Apollo's People Match usually leaves kind/description null, but use them
+        # (and an explicit employment_type/fte) when a source does provide them.
+        etype = entry.get("employment_type") or classify_employment_type(
+            title, entry.get("kind"), entry.get("description")
+        )
         stint = Stint(
             company=company,
             title=title,
@@ -262,6 +307,8 @@ def normalize_apollo(person: dict[str, Any]) -> tuple[PersonInfo, list[Stint]]:
             industry=industry,
             employees=emp,
             annual_revenue=rev,
+            employment_type=etype,
+            fte=entry.get("fte"),
         )
         stints.append(classify_stint(stint))
 

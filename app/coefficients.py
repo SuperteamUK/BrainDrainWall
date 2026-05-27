@@ -147,6 +147,25 @@ MACRO_INDEX = {
 }
 MACRO_BETA = 1.00
 
+# Employment-type / FTE weighting. A role's annual value-add scales with how much
+# of a full-time equivalent (FTE) it represents — a few-hours-a-week student job
+# is not a full salary of GDP. Apollo's People Match does NOT reliably return
+# employment type (its `kind`/`description` fields are usually null), so this
+# defaults to full-time and is applied only when the type is stated in the title,
+# in Apollo's fields, or supplied via the preview API (or an explicit `fte`).
+FTE_BY_EMPLOYMENT_TYPE = {
+    "full_time": 1.00,
+    "self_employed": 1.00,
+    "contract": 0.80,
+    "freelance": 0.60,
+    "apprenticeship": 0.50,
+    "internship": 0.50,
+    "part_time": 0.40,
+    "seasonal": 0.30,
+    "volunteer": 0.20,
+}
+DEFAULT_FTE = 1.00
+
 # Forward projection (what is lost if they leave / gained if they arrive).
 CAREER_START_AGE = 22
 RETIREMENT_AGE = 65

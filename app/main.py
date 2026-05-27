@@ -115,6 +115,8 @@ def gdp_impact_preview(req: PreviewRequest) -> GDPImpactResponse:
             industry=item.industry,
             employees=item.employees,
             annual_revenue=item.annual_revenue,
+            employment_type=item.employment_type,
+            fte=item.fte,
         )
         stints.append(classify_stint(stint))
 

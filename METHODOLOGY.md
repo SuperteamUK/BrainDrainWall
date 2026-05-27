@@ -162,6 +162,21 @@ employee-count gate (a venture is either a real company or not), but above it th
 footprint is continuous in size — e.g. ≈£25m at 15 staff, ≈£0.3bn at 200, ≈£3.3bn
 at 2,000.
 
+**Round 6 — employment type / FTE, and student-role seniority (current).** Two
+refinements after testing a part-time student job. (1) A role's annual value-add
+is scaled by a **full-time-equivalent (FTE)** factor, so a part-time, internship
+or freelance role is not booked as a full salary of GDP. The type is read from
+the title, from Apollo's `kind`/`description` when present, or supplied via the
+preview API (or an explicit `fte`), and **defaults to full-time** — and Apollo's
+People Match does not return employment type, so the live path assumes full-time
+unless stated (the §6 caveat applies). (2) A bare "Tutor" / "teaching assistant"
+title now classifies as **junior**, not mid, reflecting its typical (student)
+level. Code: `parsing.classify_employment_type` / `resolve_fte`,
+`coefficients.FTE_BY_EMPLOYMENT_TYPE`. *Known gap (next round):* the founder
+footprint (§7) still uses a flat tech-anchored GVA-per-employee, so a founder of
+a community/education/charity body is overstated relative to a software founder;
+making founder GVA sector- and revenue-aware is the planned fix.
+
 ## 5. Forward projection (what is lost / gained)
 
 The wall number is forward-looking: the GDP a person *would* contribute over
@@ -193,11 +208,17 @@ their remaining working life.
 - Coefficients are USD-denominated and US-economy-anchored. Other countries
   need their own base intercept and macro series.
 - **The model reads job titles and firm size, not hours or impact-per-hour.** It
-  cannot tell a full-time role from a few-hours-a-week one, so a part-time or
-  student job is scored at the full-time base unless its calendar overlaps a
-  higher-value role (in which case the timeline rule, §4 Round 4, drops it). A
-  genuinely standalone part-time stint will still be overstated; supply explicit
-  hours/FTE via the preview endpoint where accuracy matters.
+  applies an employment-type/FTE discount when the type is stated (in the title,
+  in Apollo's fields, or as an explicit `fte` via the preview API), but Apollo's
+  People Match does not return employment type, so an *unstated* part-time or
+  student job still defaults to full-time and is overstated — unless its calendar
+  overlaps a higher-value role (the timeline rule, §4 Round 4) or the FTE is
+  supplied. See §4 Round 6.
+- **The founder footprint uses a single tech-anchored GVA-per-employee and ignores
+  sector.** A founder of an N-person *community, charity or education* body is
+  scored like a founder of an N-person software company, which overstates
+  low-GVA/non-commercial organisations. Industry-aware founder GVA (and a
+  revenue/again non-profit check) is a known gap — see §4 Round 6 note.
 - **Value created outside an employer's books is invisible.** A community
   builder or ecosystem lead who unlocks grants, jobs and companies for *other*
   people generates GDP the model cannot see from their own title and headcount,
