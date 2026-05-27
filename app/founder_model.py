@@ -128,6 +128,10 @@ def _realized_current_company(stints: list[Stint]) -> Optional[dict]:
 
 
 def is_founder(stints: list[Stint]) -> bool:
+    """True only for *scale-qualified* founders/owners. parsing.classify_stint
+    reclassifies sub-scale founders (no employees/revenue/firm scale) to
+    `self_employed`, so a solo or side venture does not trigger the founder
+    footprint — that lens is calibrated to high-growth founders (METHODOLOGY §7-8)."""
     return any(s.seniority in ("founder", "owner") for s in stints)
 
 

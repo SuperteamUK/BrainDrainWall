@@ -113,11 +113,37 @@ sanity panel: a *junior* at a tier-5 firm inherited the firm's full scale and
 scored like a director. Firm prestige should not flow to people who don't steer
 the firm's capital.
 
-**Round 3 — leverage interaction (current).** Introduced `λ[level]`, the share
+**Round 3 — leverage interaction.** Introduced `λ[level]`, the share
 of firm scale a role actually commands. A junior at Goldman now scores like a
 junior; the CFO absorbs the firm's systemic scale. The sanity panel lands in
 defensible ranges and the ordering is monotone in seniority within a firm —
 both checked in `tests/test_model.py`.
+
+**Round 4 — two over-counting fixes (current).** Live testing on a real career
+surfaced two ways the model overstated GDP:
+
+1. *Concurrent roles were summed.* Historical contribution added every stint's
+   full value over its calendar span, so overlapping roles — a side project, a
+   part-time gig, an advisory seat held alongside a day job — billed the same
+   years twice or more. In the test case a five-year part-time tutoring role,
+   running underneath four other roles, was counted in full *on top* of them.
+   Fix: integrate value-add over the career **timeline** — in any interval only
+   the single highest-value active role counts, since a person delivers about
+   one full-time-equivalent of value-add at a time. `historical` is now the
+   union-of-time envelope, not the sum of stints (per-stint figures are still
+   reported individually for transparency). Code: `model._historical_gdp`.
+2. *Every "Founder" got the high-growth premium.* A title containing "founder"
+   earned both the steep founder seniority multiplier (≈7.4×) **and** the ≈£29m
+   expected-company footprint — regardless of whether the venture had any
+   employees, revenue or scale. A defunct one-person Instagram brand (sold for
+   pocket money) scored like a VC-backed startup. Fix: **scale-gate** founders.
+   A founder/owner is treated as a company-building founder only with evidence
+   of scale (≥ `FOUNDER_SCALE_MIN_EMPLOYEES` employees, or any revenue, or a
+   mid-market+ firm tier); otherwise the role is scored as `self_employed` on
+   the employee model and triggers **no** founder footprint. This keeps the
+   ≈£29m figure on the high-growth founders it was calibrated for (§7-8). Code:
+   `parsing._founder_has_scale`; the "Startup founder/CEO ~$1.0M" sanity anchor
+   above assumes such a scale-qualified founder.
 
 ## 5. Forward projection (what is lost / gained)
 
@@ -149,6 +175,17 @@ their remaining working life.
   advice.
 - Coefficients are USD-denominated and US-economy-anchored. Other countries
   need their own base intercept and macro series.
+- **The model reads job titles and firm size, not hours or impact-per-hour.** It
+  cannot tell a full-time role from a few-hours-a-week one, so a part-time or
+  student job is scored at the full-time base unless its calendar overlaps a
+  higher-value role (in which case the timeline rule, §4 Round 4, drops it). A
+  genuinely standalone part-time stint will still be overstated; supply explicit
+  hours/FTE via the preview endpoint where accuracy matters.
+- **Value created outside an employer's books is invisible.** A community
+  builder or ecosystem lead who unlocks grants, jobs and companies for *other*
+  people generates GDP the model cannot see from their own title and headcount,
+  and will be understated. The model measures a person's value-add *within* a
+  firm, not network or catalytic effects around them.
 
 ---
 
@@ -162,6 +199,13 @@ startups fail, a few are modest exits, a tiny fraction carry everything — so w
 compute an **expectation over outcomes** rather than a point estimate. Code:
 `app/founder_model.py`; coefficients in the FOUNDER block of
 `app/coefficients.py`. All figures are **GBP** (the campaign is UK-specific).
+
+This footprint is applied only to **scale-qualified** founders (§4, Round 4): a
+founder/owner with evidence of a real company — employees, revenue, or a
+mid-market+ firm tier. A solo, side or defunct micro-venture is scored on the
+employee model as `self_employed` and gets no founder footprint, because the
+priors below are calibrated to high-growth, company-building founders and would
+otherwise turn a hobby project into a multi-million-pound figure.
 
 The model is the sum of four pathways, each requested for the campaign and each
 grounded in the "Profitable Peripherals" report's multiplier methodology (jobs

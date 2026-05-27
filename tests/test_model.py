@@ -73,6 +73,41 @@ def test_compute_impact_shape_and_projection():
     assert "GDP" in summary.headline_statement
 
 
+def test_overlapping_roles_not_double_counted():
+    """A long role fully overlapping another must not add a second full salary;
+    historical = the highest-value role per interval, not the sum of stints."""
+    main = make("Software Engineer", "MainCo", "2020-01-01", "2024-01-01")
+    side = make("Tutor", "SideCo", "2020-01-01", "2024-01-01")
+    main_only = score_stint(
+        make("Software Engineer", "MainCo", "2020-01-01", "2024-01-01"),
+        today=date(2024, 1, 1),
+    ).total_gdp_contribution
+    summary, _ = compute_impact([main, side], today=date(2024, 1, 1))
+    # Engineer outscores tutor, so the envelope ~= the engineer role alone,
+    # well below the naive sum of the two stints.
+    assert summary.historical_gdp_contribution <= main_only * 1.02
+    assert summary.historical_gdp_contribution < (
+        main_only + score_stint(side, today=date(2024, 1, 1)).total_gdp_contribution
+    )
+
+
+def test_sequential_roles_still_add_up():
+    """Non-overlapping roles are summed as before (no regression)."""
+    a = make("Manager", "Acme", "2010-01-01", "2014-01-01")
+    b = make("Manager", "Beta", "2014-01-01", "2018-01-01")
+    summary, scores = compute_impact([a, b], today=date(2018, 1, 1))
+    naive = sum(s.total_gdp_contribution for s in scores)
+    assert abs(summary.historical_gdp_contribution - naive) < naive * 0.02
+
+
+def test_sub_scale_founder_scores_far_below_scaled_founder():
+    micro = make("Founder", "Hobby Brand", "2019-01-01", "2020-01-01")  # no scale
+    scaled = make("Founder", "RealCo", "2019-01-01", current=True, employees=200)
+    assert micro.seniority == "self_employed"
+    assert scaled.seniority == "founder"
+    assert annual_contribution(micro)[0] < annual_contribution(scaled)[0] / 3
+
+
 def test_no_dates_does_not_crash():
     stint = classify_stint(Stint(company="X", title="Engineer"))
     summary, scores = compute_impact([stint], person_name="Nobody")

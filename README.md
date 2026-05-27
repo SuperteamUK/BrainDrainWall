@@ -101,7 +101,7 @@ impact). The reusable function is `app.scoring.score_apollo_person`.
     "future_gdp_contribution_npv":           2400000000,   // present value
     "lifetime_gdp_contribution":             4767600000,
     "headline_statement": "Jane has contributed ... If they leave ...",
-    "model_version": "0.1.0-calibrated"
+    "model_version": "0.2.0-calibrated"
   },
   "stints": [ /* per-role breakdown with the multiplier components */ ]
 }

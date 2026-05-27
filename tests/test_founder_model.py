@@ -22,9 +22,25 @@ def founder_stint(employees=None):
 
 
 def test_is_founder_detection():
-    assert is_founder([founder_stint()]) is True
+    # A scale-qualified founder (real headcount) is a founder...
+    assert is_founder([founder_stint(employees=60)]) is True
     employee = classify_stint(Stint(company="BigCo", title="Software Engineer"))
     assert is_founder([employee]) is False
+
+
+def test_sub_scale_founder_is_not_a_founder():
+    # A solo / side / defunct micro-venture (no employees, revenue or firm scale)
+    # is scored as self-employed and must NOT trigger the founder footprint.
+    micro = classify_stint(
+        Stint(
+            company="Hobby Brand",
+            title="Founder",
+            start_date=date(2019, 1, 1),
+            end_date=date(2020, 1, 1),
+        )
+    )
+    assert micro.seniority == "self_employed"
+    assert is_founder([micro]) is False
 
 
 def test_bucket_probabilities_sum_to_one():

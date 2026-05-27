@@ -98,6 +98,37 @@ def score_stint(stint: Stint, today: Optional[date] = None) -> StintScore:
     )
 
 
+def _historical_gdp(stints: list[Stint], today: date) -> float:
+    """Value-add summed over the career *calendar*, not over stints.
+
+    Roles routinely overlap — a side project, a part-time gig, an advisory seat
+    held alongside a main job. Summing each stint's full contribution bills the
+    same calendar time several times over (a multi-year part-time role running
+    underneath several others would be counted in full on top of them). Instead
+    we lay the stints on a timeline and, for every interval, count only the
+    single highest-value role active then: a person delivers about one
+    full-time-equivalent of value-add at a time, set by their primary role.
+    """
+    intervals: list[tuple[date, date, float]] = []
+    for s in stints:
+        if not s.start_date:
+            continue
+        end = s.end_date or today
+        if end <= s.start_date:
+            continue
+        intervals.append((s.start_date, end, annual_contribution(s)[0]))
+    if not intervals:
+        return 0.0
+
+    boundaries = sorted({p for iv in intervals for p in (iv[0], iv[1])})
+    total = 0.0
+    for t0, t1 in zip(boundaries, boundaries[1:]):
+        active = [rate for (start, end, rate) in intervals if start <= t0 and end >= t1]
+        if active:
+            total += max(active) * ((t1 - t0).days / 365.25)
+    return total
+
+
 def _experience_years(stints: list[Stint], today: Optional[date] = None) -> float:
     today = today or date.today()
     starts = [s.start_date for s in stints if s.start_date]
@@ -166,7 +197,7 @@ def compute_impact(
     framing = framing or C.DEFAULT_FRAMING
     today = today or date.today()
     scores = [score_stint(s, today) for s in stints]
-    historical = sum(s.total_gdp_contribution for s in scores)
+    historical = _historical_gdp(stints, today)
 
     current = _current_stint(stints)
     current_annual = annual_contribution(current)[0] if current else 0.0
